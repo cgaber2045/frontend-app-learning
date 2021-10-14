@@ -9,35 +9,206 @@ import messages from './messages';
 import { useModel } from '../../generic/model-store';
 
 import {
-  SearchField,
   DropdownButton,
-  Dropdown
+  Dropdown,
+  Collapsible,
+  Button,
+  Container,
+  Icon,
+  ActionRow,
+  SearchField,
+  IconButton,
+  Pagination,
 } from '@edx/paragon';
 
+import { ExpandLess, ExpandMore } from '@edx/paragon/icons';
+
 export const CourseContext = createContext();
+export const KeyTermContext = createContext();
+const ListViewContext = createContext();
+
+function ResourceList() {
+  const { resources } = useContext(KeyTermContext);
+  return (
+    <div className='ref-container flex-col'>
+      <b>References:</b>
+      {resources.map(function (resource) {
+        return (
+          <p>
+            <a href={resource.resource_link}>{resource.friendly_name}</a>
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function Lessons() {
+  const { lessons } = useContext(KeyTermContext);
+  return (
+    <div className='lessons-container flex-col'>
+      <b>Lessons</b>
+      {/*
+      {lessons.map(function (lesson) {
+        return (
+          <Button variant='outline-primary' className='lesson-ref mb-3'>
+          {lesson.title}
+          </Button>
+        );
+      })}
+      */}
+    </div>
+  );
+}
+
+function Textbook({ textbook }) {
+  const [variant, setVariant] = useState('primary');
+  const [buttonText, setButtonText] = useState('Copy Link');
+
+  const { courseId } = useContext(CourseContext);
+  const assetId = courseId.replace('course', 'asset');
+
+  const lmsTextbookLink = `localhost:18000/${assetId}+type@asset+block@${textbook.textbook_link}#page=${textbook.page_num}`;
+
+  return (
+    <p>
+      {textbook.chapter} pg. {textbook.page_num} &nbsp; &nbsp;
+      <Button
+        variant={variant}
+        size='inline'
+        title='Copy Link'
+        onClick={() => {
+          navigator.clipboard.writeText(lmsTextbookLink);
+          setVariant('light');
+          setButtonText('Copied');
+        }}
+      >
+        {' '}
+        {buttonText}{' '}
+      </Button>
+    </p>
+  );
+}
+
+function TextbookList() {
+  const { textbooks } = useContext(KeyTermContext);
+  return (
+    <div className='textbook-container flex-col'>
+      <b>Textbooks</b>
+      {textbooks.map(function (textbook) {
+        return (
+          <Textbook key={textbook.id} textbook={textbook} />
+        );
+      })}
+    </div>
+  );
+}
+
+function DefinitionsList() {
+  const { definitions } = useContext(KeyTermContext);
+  return (
+    <div className='definitions-container flex-col'>
+      <b>Definitions</b>
+      {definitions.map(function (descr) {
+        return (
+          <div className='definition'>
+            <p>{descr.description}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function KeyTerm() {
+  const { key_name } = useContext(KeyTermContext);
+  
+  return (
+    <div className='key-term-container'>
+      <Collapsible
+        title={<b>{key_name}</b>}
+        styling='card-lg'
+        iconWhenOpen={<Icon src={ExpandLess} />}
+        iconWhenClosed={<Icon src={ExpandMore} />}
+      >
+        <KeyTermData />
+      </Collapsible>
+    </div>
+  );
+}
+
+function KeyTermData() {
+  return (
+    <div className='key-term-info'>
+      <DefinitionsList />
+      <TextbookList />
+      <Lessons />
+      <ResourceList />
+    </div>
+  );
+}
 
 function KeyTermList() {
+  const { searchQuery, selectedPage, setPagination } = useContext(ListViewContext);
   const { courseId, termData, setTermData } = useContext(CourseContext);
 
-  const restUrl = `http://localhost:18500/api/v1/course_terms?course_id=${courseId}`;
+  function paginate(termList, page_size, page_number) {
+    return termList.slice(
+      (page_number - 1) * page_size,
+      page_number * page_size
+    );
+  }
 
-  fetch(restUrl)
-    .then((response) => response.json())
-    .then((jsonData) => {
-      setTermData(jsonData);
+  // Fetch data from edx_keyterms_api
+  const getTerms=()=> {
+    const encodedCourse = encodeURIComponent(courseId);
+    const restUrl = `http://localhost:18500/api/v1/course_terms?course_id=${encodedCourse}`;
+    fetch(restUrl, {
+      method: "GET"
     })
+    .then((response) => response.json())
+    .then((jsonData) => setTermData(jsonData))
     .catch((error) => {
-      // handle your errors here
       console.error(error);
     });
+  }
 
-  const displayTerms = termData;
+  useEffect(()=>{
+    getTerms();
+  },[]);
+    
+  const displayTerms = termData
+    .filter(function (keyTerm) {
+      return keyTerm.key_name
+        .toString()
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+    })
+    .sort(function compare(a, b) {
+      if (a.key_name < b.key_name) {
+        return -1;
+      }
+      if (a.key_name > b.key_name) {
+        return 1;
+      }
+      return 0;
+    });
+  
+  setPagination(displayTerms.length / 50);
+  if (displayTerms.length === 0) setPagination(0);
 
   return (
     <div className='key-term_list'>
       {displayTerms.length === 0 ? (
         <h3 className='filter-container'>No Terms to Display...</h3>
       ) : null}
+      {paginate(displayTerms, 50, selectedPage).map(function (keyTerm) {
+      return (
+        <KeyTermContext.Provider value={keyTerm}>
+          <KeyTerm key={displayTerms.id} />
+        </KeyTermContext.Provider>
+      );
+      })}
     </div>
   );
 }
@@ -47,11 +218,11 @@ function GlossaryTab({ intl }) {
     courseId,
   } = useSelector(state => state.courseHome);
 
-  const {
-    
-  } = useModel('glossary', courseId);
-
+  const [searchQuery, setSearchQuery] = useState('');
   const [termData, setTermData] = useState([]);
+  const [selectedPage, setSelectedPage] = useState(1);
+  const [pagination, setPagination] = useState();
+  const [expandAll, setExpandAll] = useState(false);
 
   return (
     <>
@@ -61,26 +232,58 @@ function GlossaryTab({ intl }) {
       </div>
 
       {/* Search Functions */}
-      <div class="row">
+      <ActionRow>
+
+        {
+        <p>
+          Displaying {pagination > 0 ? 1 + 50 * (selectedPage - 1) : 0}
+                      -
+                      {pagination * 50 < 50
+                        ? parseInt(pagination * 50)
+                        : 50 * selectedPage}{' '}
+                      of {parseInt(pagination * 50)} items
+        </p>
+        }
+
+        <ActionRow.Spacer />
+        
         <SearchField
                     onSubmit={(value) => {
-                      console.log(`search submitted: ${value}`);
-                      console.log(value);
+                      setSearchQuery(value);
                     }}
-                    onClear={() => console.log()}
+                    onClear={() => setSearchQuery("")
+                    }
                     placeholder='Search'
         />
 
         <DropdownButton id="dropdown-basic-button" title="Filter Modules">
+          {/* waiting for lessons */}
           <Dropdown.Item href="#/action-1">Action</Dropdown.Item>
-          <Dropdown.Item href="#/action-2">Another action</Dropdown.Item>
-          <Dropdown.Item href="#/action-3">Something else</Dropdown.Item>
         </DropdownButton>
-      </div>
+
+      </ActionRow>
       
       {/* List of Key Terms */}
       <CourseContext.Provider value={{ courseId, termData, setTermData }}>
-        <KeyTermList /> 
+        <ListViewContext.Provider value = {{setPagination, searchQuery, selectedPage, expandAll, setExpandAll}}>
+          <KeyTermList /> 
+        </ListViewContext.Provider>
+      
+      {
+        <div className='footer-container'>
+          {pagination === 0 ? null : (
+            <Pagination
+              paginationLabel='pagination navigation'
+              pageCount={
+                pagination > parseInt(pagination)
+                  ? parseInt(pagination) + 1
+                  : pagination
+              }
+              onPageSelect={(value) => setSelectedPage(value)}
+            />
+          )}
+        </div>
+      }
       </CourseContext.Provider>
       
     </>
