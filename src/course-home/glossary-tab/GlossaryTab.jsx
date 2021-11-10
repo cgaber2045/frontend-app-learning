@@ -6,27 +6,27 @@ import './GlossaryTab.scss';
 
 import messages from './messages';
 
-import { useModel } from '../../generic/model-store';
-
 import {
   DropdownButton,
   Dropdown,
   Collapsible,
   Button,
-  Container,
   Icon,
   ActionRow,
   SearchField,
-  IconButton,
   Pagination,
 } from '@edx/paragon';
 
 import { ExpandLess, ExpandMore } from '@edx/paragon/icons';
 
+// Getting all necessary contexts and variables
 export const CourseContext = createContext();
 export const KeyTermContext = createContext();
 const ListViewContext = createContext();
+const queryParams = new URLSearchParams(window.location.search);
+const scrolltoParam = queryParams.get('scrollTo');
 
+// Lists all resources
 function ResourceList() {
   const { resources } = useContext(KeyTermContext);
   return (
@@ -43,6 +43,7 @@ function ResourceList() {
   );
 }
 
+// Lists all lessons
 function Lessons() {
   const { lessons } = useContext(KeyTermContext);
   return (
@@ -61,6 +62,7 @@ function Lessons() {
   );
 }
 
+// Gets a specific textbook
 function Textbook({ textbook }) {
   const [variant, setVariant] = useState('primary');
   const [buttonText, setButtonText] = useState('Copy Link');
@@ -90,6 +92,7 @@ function Textbook({ textbook }) {
   );
 }
 
+// Lists all textbooks
 function TextbookList() {
   const { textbooks } = useContext(KeyTermContext);
   return (
@@ -104,6 +107,7 @@ function TextbookList() {
   );
 }
 
+// Lists all definitions
 function DefinitionsList() {
   const { definitions } = useContext(KeyTermContext);
   return (
@@ -120,12 +124,19 @@ function DefinitionsList() {
   );
 }
 
+// Refers to one key term.
 function KeyTerm() {
   const { key_name } = useContext(KeyTermContext);
-  
+
   return (
     <div className='key-term-container'>
-      <Collapsible
+      <Collapsible ref={function(ref) {
+          if (ref != null && scrolltoParam == key_name) {
+            console.log(ref)
+            window.scrollTo(0, ref.offsetTop);
+            ref.open();
+          }
+        }}
         title={<b>{key_name}</b>}
         styling='card-lg'
         iconWhenOpen={<Icon src={ExpandLess} />}
@@ -137,6 +148,7 @@ function KeyTerm() {
   );
 }
 
+// All the data needed for a keyterm.
 function KeyTermData() {
   return (
     <div className='key-term-info'>
@@ -148,6 +160,7 @@ function KeyTermData() {
   );
 }
 
+// Lists all keyterms
 function KeyTermList() {
   const { searchQuery, selectedPage, setPagination } = useContext(ListViewContext);
   const { courseId, termData, setTermData } = useContext(CourseContext);
@@ -161,7 +174,7 @@ function KeyTermList() {
 
   // Fetch data from edx_keyterms_api
   const getTerms=()=> {
-    const encodedCourse = encodeURIComponent(courseId);
+    const encodedCourse = courseId.replace(" ", "+");
     const restUrl = `http://localhost:18500/api/v1/course_terms?course_id=${encodedCourse}`;
     fetch(restUrl, {
       method: "GET"
@@ -213,6 +226,7 @@ function KeyTermList() {
   );
 }
 
+// Refers to the whole glossary page
 function GlossaryTab({ intl }) {
   const {
     courseId,
