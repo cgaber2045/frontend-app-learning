@@ -49,16 +49,25 @@ function Lessons() {
   return (
     <div className='lessons-container flex-col'>
       <b>Lessons</b>
-      {/*
-      {lessons.map(function (lesson) {
+      { 
+      lessons.map(function (lesson) {
         return (
-          <Button variant='outline-primary' className='lesson-ref mb-3'>
-          {lesson.title}
-          </Button>
+          <Lesson key={lesson.id} lesson={lesson} />
         );
-      })}
-      */}
+      }) 
+      }
     </div>
+  );
+}
+
+// Gets a specific textbook
+function Lesson({ lesson }) {
+  const { courseId } = useContext(CourseContext);
+  const encodedCourse = courseId.replace(" ", "+");
+  return (
+    <p>
+      <a href={`http://localhost:2000/course/${encodedCourse}/${lesson.lesson_link}`}> Lesson {lesson.lesson_number}: {lesson.lesson_name} <br/> Module: {lesson.module_name} </a> &nbsp; &nbsp;
+    </p>
   );
 }
 
@@ -74,7 +83,7 @@ function Textbook({ textbook }) {
 
   return (
     <p>
-      {textbook.chapter} pg. {textbook.page_num} &nbsp; &nbsp;
+      {textbook.chapter}, pg. {textbook.page_num} &nbsp; &nbsp;
       <Button
         variant={variant}
         size='inline'
@@ -158,6 +167,20 @@ function KeyTermData() {
       <ResourceList />
     </div>
   );
+}
+
+function ModuleDropdown() {
+  //const { lessons } = useContext(KeyTermContext);
+  return (
+    <DropdownButton id="dropdown-basic-button" title="Filter Modules">
+    { /*
+      lessons.map(function (lesson) {
+          <Dropdown.Item href="#/action-1">{lesson.module_name}</Dropdown.Item>
+      }) 
+      */
+    }
+    </DropdownButton>
+  )
 }
 
 // Lists all keyterms
@@ -270,10 +293,7 @@ function GlossaryTab({ intl }) {
                     placeholder='Search'
         />
 
-        <DropdownButton id="dropdown-basic-button" title="Filter Modules">
-          {/* waiting for lessons */}
-          <Dropdown.Item href="#/action-1">Action</Dropdown.Item>
-        </DropdownButton>
+        <ModuleDropdown/>
 
       </ActionRow>
       
