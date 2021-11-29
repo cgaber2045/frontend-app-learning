@@ -8,13 +8,13 @@ import messages from './messages';
 
 import {
   DropdownButton,
-  Dropdown,
   Collapsible,
   Button,
   Icon,
   ActionRow,
   SearchField,
   Pagination,
+  Form
 } from '@edx/paragon';
 
 import { ExpandLess, ExpandMore } from '@edx/paragon/icons';
@@ -34,7 +34,7 @@ function ResourceList() {
       <b>References:</b>
       {resources.map(function (resource) {
         return (
-          <p>
+          <p key={resource.id}>
             <a href={resource.resource_link}>{resource.friendly_name}</a>
           </p>
         );
@@ -141,7 +141,6 @@ function KeyTerm() {
     <div className='key-term-container'>
       <Collapsible ref={function(ref) {
           if (ref != null && scrolltoParam == key_name) {
-            console.log(ref)
             window.scrollTo(0, ref.offsetTop);
             ref.open();
           }
@@ -169,31 +168,84 @@ function KeyTermData() {
   );
 }
 
-function ModuleDropdown() {
-  //const { lessons } = useContext(KeyTermContext);
+// Filter modules button
+function ModuleDropdown(termData) {
+  const { filterModules, setFilterModules } = useContext(ListViewContext);
+  var lessons = []
+  var newSet = new Set()
+  termData["value"]["termData"].filter(function (keyTerm) {
+    keyTerm.lessons.forEach(lesson => {
+      if (lessons.find(function(object) {return object.module_name === lesson.module_name}) === undefined) lessons.push(lesson)
+    });
+  })
+
+  const handleChange = e => {
+    filterModules.forEach(item => {newSet.add(item)});
+    e.target.checked ? newSet.add(e.target.value) : newSet.delete(e.target.value);
+    setFilterModules(newSet);
+  }
+
   return (
     <DropdownButton id="dropdown-basic-button" title="Filter Modules">
-    { /*
-      lessons.map(function (lesson) {
-          <Dropdown.Item href="#/action-1">{lesson.module_name}</Dropdown.Item>
-      }) 
-      */
-    }
+      <Form.Group>
+        <Form.CheckboxSet name="modules" onChange={handleChange}>
+        {lessons.map(lesson => <Form.Checkbox value={lesson.module_name}>{lesson.module_name}</Form.Checkbox>)}
+        </Form.CheckboxSet>
+      </Form.Group>
     </DropdownButton>
   )
 }
 
 // Lists all keyterms
 function KeyTermList() {
-  const { searchQuery, selectedPage, setPagination } = useContext(ListViewContext);
-  const { courseId, termData, setTermData } = useContext(CourseContext);
+  const { filterModules, searchQuery, selectedPage, setPagination } = useContext(ListViewContext);
+  const { termData } = useContext(CourseContext);
 
   function paginate(termList, page_size, page_number) {
-    return termList.slice(
-      (page_number - 1) * page_size,
-      page_number * page_size
-    );
+    return termList.slice((page_number - 1) * page_size, page_number * page_size);
   }
+    
+  const displayTerms = termData
+    .filter(function (keyTerm) {
+      console.log(filterModules);
+      if (filterModules.size == 0 || keyTerm.lessons.find(function(object) {return filterModules.has(object.module_name)}) !== undefined)
+        return keyTerm.key_name
+          .toString()
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
+    })
+    .sort(function compare(a, b) {
+      if (a.key_name < b.key_name) return -1;
+      if (a.key_name > b.key_name) return 1;
+      return 0;
+    });
+  
+  setPagination(displayTerms.length / 50);
+  if (displayTerms.length === 0) setPagination(0);
+
+  return (
+    <div className='key-term_list'>
+      {displayTerms.length === 0 ? (<h3 className='filter-container'>No Terms to Display...</h3>) : null}
+      {paginate(displayTerms, 50, selectedPage).map(function (keyTerm) {
+      return (
+        <KeyTermContext.Provider value={keyTerm}>
+          <KeyTerm key={displayTerms.id} />
+        </KeyTermContext.Provider>
+      );
+      })}
+    </div>
+  );
+}
+
+// Refers to the whole glossary page
+function GlossaryTab({ intl }) {
+  const { courseId } = useSelector(state => state.courseHome);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterModules, setFilterModules] = useState(new Set());
+  const [termData, setTermData] = useState([]);
+  const [selectedPage, setSelectedPage] = useState(1);
+  const [pagination, setPagination] = useState();
+  const [expandAll, setExpandAll] = useState(false);
 
   // Fetch data from edx_keyterms_api
   const getTerms=()=> {
@@ -212,54 +264,6 @@ function KeyTermList() {
   useEffect(()=>{
     getTerms();
   },[]);
-    
-  const displayTerms = termData
-    .filter(function (keyTerm) {
-      return keyTerm.key_name
-        .toString()
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-    })
-    .sort(function compare(a, b) {
-      if (a.key_name < b.key_name) {
-        return -1;
-      }
-      if (a.key_name > b.key_name) {
-        return 1;
-      }
-      return 0;
-    });
-  
-  setPagination(displayTerms.length / 50);
-  if (displayTerms.length === 0) setPagination(0);
-
-  return (
-    <div className='key-term_list'>
-      {displayTerms.length === 0 ? (
-        <h3 className='filter-container'>No Terms to Display...</h3>
-      ) : null}
-      {paginate(displayTerms, 50, selectedPage).map(function (keyTerm) {
-      return (
-        <KeyTermContext.Provider value={keyTerm}>
-          <KeyTerm key={displayTerms.id} />
-        </KeyTermContext.Provider>
-      );
-      })}
-    </div>
-  );
-}
-
-// Refers to the whole glossary page
-function GlossaryTab({ intl }) {
-  const {
-    courseId,
-  } = useSelector(state => state.courseHome);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [termData, setTermData] = useState([]);
-  const [selectedPage, setSelectedPage] = useState(1);
-  const [pagination, setPagination] = useState();
-  const [expandAll, setExpandAll] = useState(false);
 
   return (
     <>
@@ -270,7 +274,6 @@ function GlossaryTab({ intl }) {
 
       {/* Search Functions */}
       <ActionRow>
-
         {
         <p>
           Displaying {pagination > 0 ? 1 + 50 * (selectedPage - 1) : 0}
@@ -281,7 +284,6 @@ function GlossaryTab({ intl }) {
                       of {parseInt(pagination * 50)} items
         </p>
         }
-
         <ActionRow.Spacer />
         
         <SearchField
@@ -292,15 +294,15 @@ function GlossaryTab({ intl }) {
                     }
                     placeholder='Search'
         />
-
-        <ModuleDropdown/>
-
+        <ListViewContext.Provider value = {{filterModules, setFilterModules}}>
+          <ModuleDropdown value={{termData}}/>
+        </ListViewContext.Provider>
       </ActionRow>
       
       {/* List of Key Terms */}
       <CourseContext.Provider value={{ courseId, termData, setTermData }}>
-        <ListViewContext.Provider value = {{setPagination, searchQuery, selectedPage, expandAll, setExpandAll}}>
-          <KeyTermList /> 
+        <ListViewContext.Provider value = {{filterModules, setFilterModules, setPagination, searchQuery, selectedPage, expandAll, setExpandAll}}>
+            <KeyTermList /> 
         </ListViewContext.Provider>
       
       {
