@@ -25,17 +25,19 @@ export const KeyTermContext = createContext();
 const ListViewContext = createContext();
 const queryParams = new URLSearchParams(window.location.search);
 const scrolltoParam = queryParams.get('scrollTo');
+const paginationLength = 15;
 
 // Lists all resources
 function ResourceList() {
   const { resources } = useContext(KeyTermContext);
+  resources.sort((a, b) => a.friendly_name > b.friendly_name ? 1 : -1)
   return (
     <div className='ref-container flex-col'>
       <b>References:</b>
       {resources.map(function (resource) {
         return (
-          <p key={resource.id}>
-            <a href={resource.resource_link}>{resource.friendly_name}</a>
+          <p>
+            <a key={resource.id} target="_blank" rel="noopener noreferrer" href={resource.resource_link}>{resource.friendly_name}</a>
           </p>
         );
       })}
@@ -46,13 +48,16 @@ function ResourceList() {
 // Lists all lessons
 function Lessons() {
   const { lessons } = useContext(KeyTermContext);
+  
+  // Sorting list by module name then by lesson name
+  lessons.sort((a, b) => a.module_name === b.module_name ? (a.lesson_name > b.lesson_name ? 1: -1) : (a.module_name > b.module_name ? 1: -1))
   return (
     <div className='lessons-container flex-col'>
       <b>Lessons</b>
       { 
       lessons.map(function (lesson) {
         return (
-          <Lesson key={lesson.id} lesson={lesson} />
+          <Lesson lesson={lesson} />
         );
       }) 
       }
@@ -66,7 +71,7 @@ function Lesson({ lesson }) {
   const encodedCourse = courseId.replace(" ", "+");
   return (
     <p>
-      <a href={`http://localhost:2000/course/${encodedCourse}/${lesson.lesson_link}`}> Lesson {lesson.lesson_number}: {lesson.lesson_name} <br/> Module: {lesson.module_name} </a> &nbsp; &nbsp;
+      <a key={lesson.id} target="_blank" rel="noopener noreferrer" href={`http://localhost:2000/course/${encodedCourse}/${lesson.lesson_link}`}> {lesson.module_name} <br/> {lesson.lesson_name} </a> &nbsp; &nbsp;
     </p>
   );
 }
@@ -74,7 +79,6 @@ function Lesson({ lesson }) {
 // Gets a specific textbook
 function Textbook({ textbook }) {
   const [variant, setVariant] = useState('primary');
-  const [buttonText, setButtonText] = useState('Copy Link');
 
   const { courseId } = useContext(CourseContext);
   const assetId = courseId.replace('course', 'asset');
@@ -83,20 +87,7 @@ function Textbook({ textbook }) {
 
   return (
     <p>
-      {textbook.chapter}, pg. {textbook.page_num} &nbsp; &nbsp;
-      <Button
-        variant={variant}
-        size='inline'
-        title='Copy Link'
-        onClick={() => {
-          navigator.clipboard.writeText(lmsTextbookLink);
-          setVariant('light');
-          setButtonText('Copied');
-        }}
-      >
-        {' '}
-        {buttonText}{' '}
-      </Button>
+      <a target="_blank" rel="noopener noreferrer" href={lmsTextbookLink}> {textbook.chapter}, pg. {textbook.page_num} </a>
     </p>
   );
 }
@@ -125,7 +116,7 @@ function DefinitionsList() {
       {definitions.map(function (descr) {
         return (
           <div className='definition'>
-            <p>{descr.description}</p>
+            <p key={descr.id} >{descr.description}</p>
           </div>
         );
       })}
@@ -134,12 +125,12 @@ function DefinitionsList() {
 }
 
 // Refers to one key term.
-function KeyTerm() {
+function KeyTerm({index}) {
   const { key_name } = useContext(KeyTermContext);
 
   return (
     <div className='key-term-container'>
-      <Collapsible ref={function(ref) {
+      <Collapsible key={index} style={ index % 2 ? { backgroundColor: "#d4d4d4" }:{ backgroundColor: "white" }} ref={function(ref) {
           if (ref != null && scrolltoParam == key_name) {
             window.scrollTo(0, ref.offsetTop);
             ref.open();
@@ -173,11 +164,14 @@ function ModuleDropdown(termData) {
   const { filterModules, setFilterModules } = useContext(ListViewContext);
   var lessons = []
   var newSet = new Set()
+
   termData["value"]["termData"].filter(function (keyTerm) {
     keyTerm.lessons.forEach(lesson => {
       if (lessons.find(function(object) {return object.module_name === lesson.module_name}) === undefined) lessons.push(lesson)
     });
   })
+
+  lessons.sort((a, b) => a.module_name > b.module_name ? 1 : -1)
 
   const handleChange = e => {
     filterModules.forEach(item => {newSet.add(item)});
@@ -207,7 +201,6 @@ function KeyTermList() {
     
   const displayTerms = termData
     .filter(function (keyTerm) {
-      console.log(filterModules);
       if (filterModules.size == 0 || keyTerm.lessons.find(function(object) {return filterModules.has(object.module_name)}) !== undefined)
         return keyTerm.key_name
           .toString()
@@ -220,16 +213,16 @@ function KeyTermList() {
       return 0;
     });
   
-  setPagination(displayTerms.length / 50);
+  setPagination(displayTerms.length / paginationLength);
   if (displayTerms.length === 0) setPagination(0);
 
   return (
     <div className='key-term_list'>
       {displayTerms.length === 0 ? (<h3 className='filter-container'>No Terms to Display...</h3>) : null}
-      {paginate(displayTerms, 50, selectedPage).map(function (keyTerm) {
+      {paginate(displayTerms, paginationLength, selectedPage).map((keyTerm, index)=> {
       return (
         <KeyTermContext.Provider value={keyTerm}>
-          <KeyTerm key={displayTerms.id} />
+          <KeyTerm index={index} key={displayTerms.id} />
         </KeyTermContext.Provider>
       );
       })}
@@ -276,12 +269,12 @@ function GlossaryTab({ intl }) {
       <ActionRow>
         {
         <p>
-          Displaying {pagination > 0 ? 1 + 50 * (selectedPage - 1) : 0}
+          Displaying {pagination > 0 ? 1 + paginationLength * (selectedPage - 1) : 0}
                       -
-                      {pagination * 50 < 50
-                        ? parseInt(pagination * 50)
-                        : 50 * selectedPage}{' '}
-                      of {parseInt(pagination * 50)} items
+                      {pagination * paginationLength < paginationLength
+                        ? parseInt(pagination * paginationLength)
+                        : paginationLength * selectedPage}{' '}
+                      of {parseInt(pagination * paginationLength)} items
         </p>
         }
         <ActionRow.Spacer />
