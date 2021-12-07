@@ -79,7 +79,7 @@ function Textbook({ textbook }) {
   const { courseId } = useContext(CourseContext);
   const assetId = courseId.replace('course', 'asset');
 
-  const lmsTextbookLink = `localhost:18000/${assetId}+type@asset+block@${textbook.textbook_link}#page=${textbook.page_num}`;
+  const lmsTextbookLink = `http://localhost:18000/${assetId}+type@asset+block@${textbook.textbook_link}#page=${textbook.page_num}`;
 
   return (
     <p>
