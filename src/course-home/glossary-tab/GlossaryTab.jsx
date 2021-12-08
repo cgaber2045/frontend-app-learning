@@ -31,7 +31,7 @@ const paginationLength = 15;
 function ResourceList() {
   const { resources } = useContext(KeyTermContext);
   resources.sort((a, b) => a.friendly_name > b.friendly_name ? 1 : -1)
-  return (
+  if (resources.length > 0) return (
     <div className='ref-container flex-col'>
       <b>References:</b>
       {resources.map(function (resource) {
@@ -43,6 +43,7 @@ function ResourceList() {
       })}
     </div>
   );
+  return null;
 }
 
 // Lists all lessons
@@ -51,7 +52,7 @@ function Lessons() {
   
   // Sorting list by module name then by lesson name
   lessons.sort((a, b) => a.module_name === b.module_name ? (a.lesson_name > b.lesson_name ? 1: -1) : (a.module_name > b.module_name ? 1: -1))
-  return (
+  if (lessons.length > 0) return (
     <div className='lessons-container flex-col'>
       <b>Lessons</b>
       { 
@@ -63,6 +64,8 @@ function Lessons() {
       }
     </div>
   );
+
+  return null;
 }
 
 // Gets a specific textbook
@@ -71,7 +74,7 @@ function Lesson({ lesson }) {
   const encodedCourse = courseId.replace(" ", "+");
   return (
     <p>
-      <a key={lesson.id} target="_blank" rel="noopener noreferrer" href={`http://localhost:2000/course/${encodedCourse}/${lesson.lesson_link}`}> {lesson.module_name} <br/> {lesson.lesson_name} </a> &nbsp; &nbsp;
+      <a key={lesson.id} target="_blank" rel="noopener noreferrer" href={`http://localhost:2000/course/${encodedCourse}/${lesson.lesson_link}`}> {lesson.module_name}&gt;{lesson.lesson_name}&gt;{lesson.unit_name}</a> &nbsp; &nbsp;
     </p>
   );
 }
@@ -95,7 +98,7 @@ function Textbook({ textbook }) {
 // Lists all textbooks
 function TextbookList() {
   const { textbooks } = useContext(KeyTermContext);
-  return (
+  if (textbooks.length > 0) return (
     <div className='textbook-container flex-col'>
       <b>Textbooks</b>
       {textbooks.map(function (textbook) {
@@ -105,12 +108,14 @@ function TextbookList() {
       })}
     </div>
   );
+
+  return null;
 }
 
 // Lists all definitions
 function DefinitionsList() {
   const { definitions } = useContext(KeyTermContext);
-  return (
+  if (definitions.length > 0) return (
     <div className='definitions-container flex-col'>
       <b>Definitions</b>
       {definitions.map(function (descr) {
@@ -122,6 +127,8 @@ function DefinitionsList() {
       })}
     </div>
   );
+  
+  return null;
 }
 
 // Refers to one key term.
@@ -179,8 +186,9 @@ function ModuleDropdown(termData) {
     setFilterModules(newSet);
   }
 
+  var buttontitle = filterModules.size > 0 ? `Filter Modules (${filterModules.size})` : "Filter Modules";
   return (
-    <DropdownButton id="dropdown-basic-button" title="Filter Modules">
+    <DropdownButton id="dropdown-basic-button" title={buttontitle}>
       <Form.Group>
         <Form.CheckboxSet name="modules" onChange={handleChange}>
         {lessons.map(lesson => <Form.Checkbox value={lesson.module_name}>{lesson.module_name}</Form.Checkbox>)}
@@ -201,11 +209,11 @@ function KeyTermList() {
     
   const displayTerms = termData
     .filter(function (keyTerm) {
+      // Displaying filtered keyterms
       if (filterModules.size == 0 || keyTerm.lessons.find(function(object) {return filterModules.has(object.module_name)}) !== undefined)
-        return keyTerm.key_name
-          .toString()
-          .toLowerCase()
-          .includes(searchQuery.toLowerCase());
+        // Returns keyterms with names or definitions matching search query
+        return keyTerm.key_name.toString().toLowerCase().includes(searchQuery.toLowerCase()) || 
+          keyTerm.definitions.find(function(object) {return object.description.toLowerCase().includes(searchQuery.toLowerCase())}) !== undefined;
     })
     .sort(function compare(a, b) {
       if (a.key_name < b.key_name) return -1;
