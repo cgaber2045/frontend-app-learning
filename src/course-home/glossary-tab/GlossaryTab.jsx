@@ -137,7 +137,7 @@ function KeyTerm({index}) {
 
   return (
     <div className='key-term-container'>
-      <Collapsible key={index} style={ index % 2 ? { backgroundColor: "#ededed" }:{ backgroundColor: "white" }} ref={function(ref) {
+      <Collapsible key={index} style={ index % 2 ? { backgroundColor: "#d4d4d4" }:{ backgroundColor: "white" }} ref={function(ref) {
           if (ref != null && scrolltoParam == key_name) {
             window.scrollTo(0, ref.offsetTop);
             ref.open();
